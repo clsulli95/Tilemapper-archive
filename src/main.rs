@@ -1,49 +1,36 @@
-use bevy::asset::LoadState;
+pub mod asset_loader;
+pub mod tilemap_loader;
+
+use crate::asset_loader::AssetManager;
+use bevy_egui::EguiPlugin;
+use log;
+use pretty_env_logger;
+
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
+//use bevy_egui::{egui, EguiContexts, EguiPlugin};
+
+// Enum that will be used as a global state for the game
+#[derive(Clone, Copy, Default, Eq, PartialEq, Debug, Hash, States)]
+pub enum AppState {
+    #[default]
+    Setup,
+    Run,
+}
 
 fn main() {
+    std::env::set_var("TILEMAPPER_LOG_LEVEL", "info");
+    pretty_env_logger::init_custom_env("TILEMAPPER_LOG_LEVEL");
+
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(EguiPlugin)
-        .insert_resource(AssetsBeingLoaded::default())
-        .add_systems(Startup, setup)
-        .add_systems(Update, check_assets_ready)
-        .add_systems(Update, ui_example_system)
+        .add_state::<AppState>()
+        .add_plugins(asset_loader::AssetLoaderPlugin)
+        .add_plugins(tilemap_loader::TilemapLoaderPlugin)
+        .add_systems(Update, update.run_if(in_state(AppState::Run)))
         .run();
 }
 
-#[derive(Default, Resource)]
-struct AssetsBeingLoaded {
-    images: Vec<Handle<Image>>,
+fn update() {
+    info!("[UpdatePlugin] Update!");
 }
-
-#[derive(Default, Resource)]
-struct AssetHandleManager {
-    images: Vec<Handle<Image>>,
-}
-
-fn setup(server: Res<AssetServer>, mut loading: ResMut<AssetsBeingLoaded>) {
-    let tilemap = server.load("tilemap.png");
-    loading.images.push(tilemap);
-}
-
-fn check_assets_ready(
-    mut commands: Commands,
-    server: Res<AssetServer>,
-    loading: ResMut<AssetsBeingLoaded>,
-    mut handle_mgr: ResMut<AssetHandleManager>,
-) {
-    loading
-        .images
-        .iter()
-        .map(|x| match server.get_load_state(x.id()) {
-            Some(LoadState::Failed) => println!("Asset {x:?} failed to load!"),
-            Some(LoadState::Loaded) => handle_mgr.images.push(Handle::from(x.clone())),
-            Some(LoadState::NotLoaded) => println!("Asset {x:?} has not been loaded!"),
-            Some(LoadState::Loading) => println!("Asset {x:?} is loading!"),
-            _ => println!("Ahh!"),
-        });
-}
-
-fn ui_example_system(mut contexts: EguiContexts) {}
